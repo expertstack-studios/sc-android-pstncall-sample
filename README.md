@@ -19,7 +19,7 @@ Ensure you have the following for using the SecuredCalls PSTN SDK for Android:
  ```kotlin
 firebaseBom = "33.1.2"  
 gms = "4.4.2"  
-scPSTN = "1.0.9"  
+scPSTN = "1.0.10"  
 ```  
 
 [libraries]
@@ -87,7 +87,7 @@ class SCPSTNCallApp: Application() {
   
     override fun onCreate() {  
         super.onCreate()  
-        securedPSTNCallsSDK.initializeSDK("**xxxxxxxSECRETxxxxxxx**")  
+        securedPSTNCallsSDK.initializeSDK(ScSDKConfigModel("**xxxxxxxSECRETxxxxxxx**", true))
     }  
 }
  ```

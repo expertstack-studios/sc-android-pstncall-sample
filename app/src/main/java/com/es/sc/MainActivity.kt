@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity(), SecuredPSTNCallBack {
     private lateinit var securedPSTNCallsSDK: SecuredPSTNCallsSDK
-    private val userIdentifier = "917020599233"
+    private val userIdentifier = "userIdentifier"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -88,7 +88,6 @@ class MainActivity : ComponentActivity(), SecuredPSTNCallBack {
                     setContent {
                         setScreenContent()
                     }
-
                 } else {
                     securedPSTNCallsSDK.requestNotificationPermission(this@MainActivity)
                 }
