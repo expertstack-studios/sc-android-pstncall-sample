@@ -21,7 +21,3 @@ dependencyResolutionManagement {
 
 rootProject.name = "SCPSTNCallSample"
 include(":app")
-include(":sc_pstn")
-//include(":sc_pstn_new")
-include(":sc_pstn_release")
-include(":sc_pstn_release_new")
