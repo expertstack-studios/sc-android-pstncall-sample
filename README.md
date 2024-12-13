@@ -19,7 +19,7 @@ Ensure you have the following for using the SecuredCalls PSTN SDK for Android:
  ```kotlin
 firebaseBom = "33.1.2"  
 gms = "4.4.2"  
-scPSTN = "1.0.10"  
+scPSTN = "1.0.11"  
 ```  
 
 [libraries]
@@ -139,7 +139,7 @@ Follow these steps to create a FirebaseMessagingService class in your Android pr
 1. Open your Android project.
 2. Right click on project source folder(e.g. notification) and click **'New -> Kotlin Class/File -> Class'** option and enter class name (e.g. ScFirebaseMessagingService)
 
-#### 2. Handling Incoming Voice SDK push in FirebaseMessagingService
+#### 2. Handling Incoming PSTN SDK push in FirebaseMessagingService
 
 1. Open the FirebaseMessagingService class (e.g. ScFirebaseMessagingService.kt) file and paste below code.
 
@@ -170,9 +170,7 @@ Add below permissions into AndroidManifest.xml file
  ```kotlin 
  <uses-feature  
  android:name="android.hardware.telephony" android:required="false" />  
-<uses-permission android:name="android.permission.INTERNET"/>  
-<uses-permission android:name="android.permission.READ_PHONE_STATE"/>  
-<uses-permission android:name="android.permission.CALL_PHONE"/>  
+<uses-permission android:name="android.permission.INTERNET"/>
 <uses-permission android:name="android.permission.WRITE_CONTACTS"/>  
 <uses-permission android:name="android.permission.READ_CONTACTS"/>  
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />  
@@ -185,29 +183,72 @@ Add below FirebaseMessagingService class (e.g. ScFirebaseMessagingService.kt) in
  <intent-filter> <action android:name="com.google.firebase.MESSAGING_EVENT" />    
  </intent-filter></service>  
  ```  
-## Handle required permissions callbacks
+## Show Permission sheet when permissions denied
+Copy below code into composer view to show permission sheet runtime when permissions denied.
+```kotlin
+val showPermissionRequiredBottomSheet by PermissionState.showPermissionRequiredBottomSheet
+val hasContactPermission by PermissionState.hasContactPermission  
+val hasNotificationPermission by PermissionState.hasNotificationPermission  
+  
+NonDismissibleBottomDialogSheet(  
+    showBottomSheet = showPermissionRequiredBottomSheet,  
+    onDismissRequest = {  
+  PermissionState.showPermissionRequiredBottomSheet.value = false  
+  },  
+) {  
+  PermissionRequiredContent(  
+        modifier = Modifier,
+        hasContactPermission = hasContactPermission,  
+        hasNotificationPermission = hasNotificationPermission,
+        onRequestContactPermission = {  
+  if (securedPSTNCallsSDK.isPermissionDeniedTwice(securedPSTNCallsSDK.CONTACT_PERMISSION_DENIED)) {
+      securedPSTNCallsSDK.openAppPermissionsSettings(this@MainActivity)  
+                needToCheckPermission = true  
+  } else {
+      securedPSTNCallsSDK.requestContactPermission(this@MainActivity, true)  
+            }  
+        },  
+        onRequestNotificationPermission = {  
+  if (securedPSTNCallsSDK.isPermissionDeniedTwice(securedPSTNCallsSDK.NOTIFICATION_PERMISSION_DENIED)) {
+      securedPSTNCallsSDK.openAppPermissionsSettings(this@MainActivity)  
+                needToCheckPermission = true  
+  } else {
+      securedPSTNCallsSDK.requestNotificationPermission(this@MainActivity, true)  
+            }  
+        }  
+  )  
+}
+ ```
+Copy below PermissionState singleton object code into kotlin class to show permission sheet runtime when permissions denied.
+ ```kotlin
+
+object PermissionState {  
+    var showPermissionRequiredBottomSheet = mutableStateOf(false)
+    var hasContactPermission = mutableStateOf(false)  
+    var hasNotificationPermission = mutableStateOf(false)  
+}
+ ```
+
+## Handle required permissions callbacks on login and permission sheet
 
 #### We need 1. Contact and 2. Notification permissions.
 Copy below code to check above runtime permissions into your app after successful login in previous step.
 
  ```kotlin  
-private fun checkPermissions() {  
-    if (securedPSTNCallsSDK.hasCallPhonePermission()) {  
+private fun checkPermissions() {
         if (securedPSTNCallsSDK.hasContactPermission()) {  
             if (securedPSTNCallsSDK.hasNotificationPermission()) {  
                 securedPSTNCallsSDK.registerDevicePushToken()  
                 setContent {  
                    setScreenContent()  
-                }  
+                }
+                needToCheckPermission = true
          } else {  
                 securedPSTNCallsSDK.requestNotificationPermission(this@MainActivity)  
             }  
         } else {  
             securedPSTNCallsSDK.requestContactPermission(this@MainActivity)  
-        }  
-    } else {  
-        securedPSTNCallsSDK.requestCallPhonePermission(this@MainActivity)  
-    }  
+        }
 } 
  ```  
 To handle permissions callback copy below code in your Activity class.
@@ -223,7 +264,29 @@ override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<Str
                 checkPermissions()  
             }  
             return  
-         }  
+         }
+
+        securedPSTNCallsSDK.PERMISSIONS_REQUEST_WRITE_CONTACTS_POPUP -> {
+            if (grantResults.isNotEmpty()) {
+                if (grantResults.contains(PackageManager.PERMISSION_DENIED)) {
+                    securedPSTNCallsSDK.handlePermissionDenied(securedPSTNCallsSDK.CONTACT_PERMISSION_DENIED)
+                } else {
+                    checkPermissionsToShowPermissionSheet()
+                }
+            }
+            return
+        }
+
+        securedPSTNCallsSDK.PERMISSIONS_REQUEST_POST_NOTIFICATIONS_POPUP -> {
+            if (grantResults.isNotEmpty()) {
+                if (grantResults.contains(PackageManager.PERMISSION_DENIED)) {
+                    securedPSTNCallsSDK.handlePermissionDenied(securedPSTNCallsSDK.NOTIFICATION_PERMISSION_DENIED)
+                } else {
+                    checkPermissionsToShowPermissionSheet()
+                }
+            }
+            return
+        }
      }  
 } 
  ```
@@ -236,16 +299,18 @@ By following these steps, you’ll integrate the SecuredCalls PSTN SDK effective
 
 ## Implementation Time Estimates Breakdown
 
-| **Task**                                 | **Description**                                                                    | **Estimated Time** |  
-|------------------------------------------|------------------------------------------------------------------------------------|--------------------|  
-| **1. Add the SDK to Your Project** | Add above defined libraries in build.gradle file and sync project.                       | 3 minutes          |  
-| **2. Add Config.dat file**       | Add Config.dat file downloaded from SecuredCalls portal into assets folder.                | 2 minutes          |  
-| **3. Add google-services.json file** | Add google-services.json file app folder for enabling firebase cloud messaging.        | 2 minutes          |  
-| **4. SDK Initialization**             | Initializing the SDK in project's application class with the provided API key.        | 2 minutes          |  
-| **5. Create FirebaseMessagingService class** | Create FirebaseMessaging class and handle Incoming Voice SDK push.             | 3 minutes          |  
-| **6. Add permissions to AndroidManifest.xml class** | Add permissions and FirebaseService class to AndroidManifest.xml        | 3 minutes          |  
-| **7. Handle SecuredPSTNCallBack interface callback** | Handle callbacks for Login.                    | 2 minutes          |  
-| **8. User Login**               | Add code for login by defining UserIdentifier to receive incoming call from Customer care.  | 3 minutes          | | **9. Handle permissions callbacks** | Handle permissions granted callback and register the device push with create session.   | 3 minutes          |  
-| **10. Re-initialize SDK session on app launch** | You can Re-initialize SDK session on app launch.                            | 2 minutes          |  
+| **Task**                                             | **Description**                                                                                   | **Estimated Time** |  
+|------------------------------------------------------|---------------------------------------------------------------------------------------------------|--------------------|  
+| **1. Add the SDK to Your Project**                   | Add above defined libraries in build.gradle file and sync project.                                | 3 minutes          |  
+| **2. Add Config.dat file**                           | Add Config.dat file downloaded from SecuredCalls portal into assets folder.                       | 2 minutes          |  
+| **3. Add google-services.json file**                 | Add google-services.json file app folder for enabling firebase cloud messaging.                   | 2 minutes          |  
+| **4. SDK Initialization**                            | Initializing the SDK in project's application class with the provided API key.                    | 2 minutes          | 
+| **5. User Login**                                    | Add code for login by defining UserIdentifier to receive incoming call from Customer care.        | 3 minutes          |
+| **6. Handle SecuredPSTNCallBack interface callback** | Handle callbacks for Login.                                                                       | 2 minutes          |
+| **7. Create FirebaseMessagingService class**         | Create FirebaseMessaging class and handle Incoming Voice SDK push.                                | 3 minutes          |  
+| **8. Add permissions to AndroidManifest.xml class**  | Add permissions and FirebaseService class to AndroidManifest.xml                                  | 3 minutes          | 
+| **9. Show Permission sheet when permissions denied** | Check runtime permission and show Permission required Sheet to enable it within app after login   | 2 minutes          |
+| **10. Handle permissions callbacks**                 | Handle required permissions callback on login and permission sheet with register the device push. | 3 minutes          |  
+| **11. Re-initialize SDK session on app launch**      | You can Re-initialize SDK session on app launch.                                                  | 2 minutes          |  
 
-**Total Estimated Time: 25 minutes**
+**Total Estimated Time: 27 minutes**
